@@ -1,5 +1,6 @@
-import {AsyncObjectMapSpec, Map, ObjectMapSpec} from "./index";
-import {num, obj, Return} from "fp-way-core";
+import {AsyncObjectMapSpec, Map, MapperSpecOptionsSym, ObjectMapSpec} from "./index";
+import {Identity, num, obj, Pipe, Return} from "fp-way-core";
+import Pick = obj.Pick;
 
 describe('Map', () => {
     type UserInfo = {
@@ -25,7 +26,6 @@ describe('Map', () => {
         email: string,
         userInfo: UserInfoView
     }
-    type UserInfoWithUserView = UserInfoView & Omit<UserView, 'userInfo'>
 
     const GetTestUserInfo = Return<UserInfo>(obj.DeepCopy({
         userId: 'dsf79f8s98f7',
@@ -66,13 +66,9 @@ describe('Map', () => {
 
         return rgb;
     }
-    const MapColorAsync = (s: string): Promise<[number, number, number]> => {
-        return new Promise((res, rej) => {
-            setTimeout(() => {
-                res(MapColor(s));
-            }, 20);
-        })
-    }
+    const MapColorAsync = (s: string): Promise<[number, number, number]> =>
+        new Promise(res => setTimeout(_ => res(MapColor(s)), 20) )
+
 
     it('get test async should return a user asynchronously', async (done) => {
         const promise: UserInfo = GetTestUserInfoAsync() as any;
@@ -85,21 +81,15 @@ describe('Map', () => {
 
     describe('sync spec', () => {
         const UserInfoUserInfoViewMapSpec: ObjectMapSpec<UserInfo, UserInfoView> = {
-            map: [
-                ['colorOfEyes', MapColor, 'colorOfEyes']
-            ],
-            transfer: ['role', 'city', 'location']
+            role: o => o.role,
+            city: o => o.city,
+            location: o => o.location,
+            colorOfEyes: o => MapColor(o.colorOfEyes)
         }
         const UserUserViewMapSpec: ObjectMapSpec<User, UserView> = {
-            map: [
-                ['userInfo', UserInfoUserInfoViewMapSpec ,'userInfo'],
-                [
-                    '',
-                    (v, o) => o.firstName + ' ' + o.lastName,
-                    'name'
-                ],
-            ],
-            transfer: ['email']
+            email: o => o.email,
+            name: o => o.firstName + ' ' + o.lastName,
+            userInfo: o => Map(UserInfoUserInfoViewMapSpec, o.userInfo)
         }
 
         it('should map objects one to another', () => {
@@ -118,26 +108,18 @@ describe('Map', () => {
     })
 
     describe('async spec', () => {
-        const AsyncUserInfoUserInfoViewMapSpec: AsyncObjectMapSpec<UserInfo, UserInfoView> = {
-            map: [
-                ['colorOfEyes', MapColorAsync, 'colorOfEyes'] // async mapping
-            ],
-            transfer: ['role', 'city', 'location'],
-            async: true
+        const UserInfoUserInfoViewMapSpec: AsyncObjectMapSpec<UserInfo, UserInfoView> = {
+            role: o => o.role,
+            city: o => o.city,
+            location: o => o.location,
+            colorOfEyes: o => MapColor(o.colorOfEyes),
+            [MapperSpecOptionsSym]: {async: true}
         }
         const UserUserViewMapSpec: AsyncObjectMapSpec<User, UserView> = {
-            map: [
-                // nested async mapping
-                ['userInfo', AsyncUserInfoUserInfoViewMapSpec ,'userInfo'],
-                // async mapping
-                [
-                    '',
-                    (v, o) => Promise.resolve(o.firstName + ' ' + o.lastName),
-                    'name'
-                ],
-            ],
-            transfer: ['email'],
-            async: true
+            email: o => o.email,
+            name: o => o.firstName + ' ' + o.lastName,
+            userInfo: o => Map(UserInfoUserInfoViewMapSpec, o.userInfo),
+            [MapperSpecOptionsSym]: {async: true}
         }
 
         it('should map objects one to another', async (done) => {
@@ -152,7 +134,6 @@ describe('Map', () => {
             expect(userView.userInfo.location).toBeDefined();
             expect(userView.userInfo.role).toBeDefined();
             expect((userView as any as User)?.id).toBeUndefined(); // should be removed
-
             done();
         })
     })
