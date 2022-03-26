@@ -4,13 +4,37 @@ Simple data mapping utility for easier hexagonal architecture implementation.
 > **reduce the amount of code that you need to write to map your objects.**
 
 # Map
-Single method that allows you to map objects synchronously or asynchronously 
+A method that allows you to map objects synchronously or asynchronously 
 using `specification`. To map an object you need to pass two parameters
 to the `Map` function: 
-1. specification object
+1. `specification` object
 2. object that you want to map
 
-## Example
+As a `result` the function will return the object that is the result of mapping.
+
+# Specification object
+Is the object where you specify how to acquire properties of the destination object
+from the source object.
+
+Each property has a name that corresponds to the
+specific property `P` of the destination object.
+Every property is a function that takes a `deep copy` of the source object
+and `returns a value` that should be put in the destination object at `P` key.
+
+Map specification looks like this
+```ts
+export type ObjectMapSpec<O1 extends DataObject, O2 extends DataObject> = {
+    [P in keyof O2]: (o: O1) => O2[P]
+} & {[MapperSpecOptionsSym]?: {async?: false}};
+
+// or async version
+export type AsyncObjectMapSpec<O1 extends DataObject, O2 extends DataObject> = {
+    [P in keyof O2]: (o: O1) => O2[P] | Promise<O2[P]>
+} & {[MapperSpecOptionsSym]: {async: true}};      // you need to set async option to true
+```
+
+# Examples
+## Simple object
 ```ts
 type UserInfo = {
     userId: string,
@@ -19,62 +43,52 @@ type UserInfo = {
     city: string,
     location: [number, number],
 }
-type User = {
-    id: string,
-    firstName: string,
-    lastName: string,
-    email: string,
-    age: number,
-    userInfo: UserInfo
+type UserInfoView = {
+    colorOfEyes: [number, number, number],
+    role: 'user' | 'admin',
+    city: string,
+    location: string,
 }
-type UserInfoView = Omit<UserInfo, 'userId' | 'colorOfEyes'> & {
-    colorOfEyes: [number, number, number]
-}
-type UserView = {
-    name: string,
-    email: string,
-    userInfo: UserInfoView
-}
-
-const MapColor: (s: string) => [number, number, number] = /* Business logic */
-const UserInfo_UserInfoViewMapSpec: ObjectMapSpec<UserInfo, UserInfoView> = {
+const UserInfoUserInfoViewMapSpec: ObjectMapSpec<UserInfo, UserInfoView> = {
     role: o => o.role,
-    city: o => o.city,
-    location: o => o.location,
+    city: o => o.city.toUpperCase(),
+    location: o => o.location[0] + '.' + o.location[1],
     colorOfEyes: o => MapColor(o.colorOfEyes)
-    // properties that you do not specify will be omitted
 }
-const User_UserViewMapSpec: ObjectMapSpec<User, UserView> = {
-    email: o => o.email,
-    name: o => o.firstName + ' ' + o.lastName,
-    userInfo: o => Map(UserInfo_UserInfoViewMapSpec, o.userInfo) // nested mapping
+const userInfo = {
+    userId: 'dsf79f8s98f7',
+    role: 'user',
+    colorOfEyes: '2FA8FF',
+    city: 'London',
+    location: [2141241, 509520523],
 }
-
-// ger result
-const user = await db.users.findById(id);
-const userView: UserView = Map<User, UserView>(User_UserViewMapSpec, user);
+const userInfoView = Map(UserInfoUserInfoViewMapSpec, userInfo);
+```
+**Result will be:**
+```
+{
+  "role": "user",
+  "city": "LONDON",
+  "location": "2141241.509520523",
+  "colorOfEyes": [47, 168, 255]
+}
 ```
 
-# Specification object
-Is the object where you specify how to acquire properties of the destination object
-from the source object.
-
-Each property has a name that corresponds to the 
-specific property `P` of the destination object.
-Every property is a function that takes a `deep copy` of the source object 
-and `returns a value` that should be put in the desination object at `P` key.
-
-For mapping nested objects there are two ways:
-## Using specification for nested object 
-recommended for bigger objects with a lot of logic
-`from the example above`
+# Mapping nested objects
+1. **Using specification to map nested objects**
+For bigger nested objects with a lot of mapping logic it's recommended to 
+put mapping logic into another specification and use Map function 
+inside the specification like so:
 ```ts
-userInfo: o => Map(UserInfo_UserInfoViewMapSpec, o.userInfo)
+const userMapSpec = {
+    userInfo: o => Map(UserInfo_UserInfoViewMapSpec, o.userInfo)
+    // ...
+}
 ```
 
-## Mapping by hand 
+2. **Mapping by hand**
+Smaller objects can be mapped directly without creating another specification.
 ```ts
-// may be more error prone
 userInfo: o => ({
     city: o.userInfo.city,
     role: o.userInfo.role,

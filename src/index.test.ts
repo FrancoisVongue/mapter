@@ -1,5 +1,5 @@
 import {AsyncObjectMapSpec, Map, MapperSpecOptionsSym, ObjectMapSpec} from "./index";
-import {Identity, num, obj, Pipe, Return} from "fp-way-core";
+import {Identity, num, obj, Pipe, Return, TypeOf} from "fp-way-core";
 import Pick = obj.Pick;
 
 describe('Map', () => {
@@ -18,8 +18,11 @@ describe('Map', () => {
         age: number,
         userInfo: UserInfo
     }
-    type UserInfoView = Omit<UserInfo, 'userId' | 'colorOfEyes'> & {
-        colorOfEyes: [number, number, number]
+    type UserInfoView = {
+        colorOfEyes: [number, number, number],
+        role: 'user' | 'admin',
+        city: string,
+        location: string,
     }
     type UserView = {
         name: string,
@@ -82,8 +85,8 @@ describe('Map', () => {
     describe('sync spec', () => {
         const UserInfoUserInfoViewMapSpec: ObjectMapSpec<UserInfo, UserInfoView> = {
             role: o => o.role,
-            city: o => o.city,
-            location: o => o.location,
+            city: o => o.city.toUpperCase(),
+            location: o => o.location[0] + '.' + o.location[1],
             colorOfEyes: o => MapColor(o.colorOfEyes)
         }
         const UserUserViewMapSpec: ObjectMapSpec<User, UserView> = {
@@ -91,6 +94,16 @@ describe('Map', () => {
             name: o => o.firstName + ' ' + o.lastName,
             userInfo: o => Map(UserInfoUserInfoViewMapSpec, o.userInfo)
         }
+
+        it('should map simple objects', () => {
+            const userInfo: UserInfo = GetTestUserInfo();
+            const userInfoView = Map(UserInfoUserInfoViewMapSpec, userInfo);
+
+            expect(userInfoView.role).toBeDefined();
+            expect(userInfoView.location).toBeDefined();
+            expect(userInfoView.city).toBeDefined();
+            expect(TypeOf(userInfoView.colorOfEyes)).toBe('array');
+        })
 
         it('should map objects one to another', () => {
             const user = GetTestUser();
@@ -111,7 +124,7 @@ describe('Map', () => {
         const UserInfoUserInfoViewMapSpec: AsyncObjectMapSpec<UserInfo, UserInfoView> = {
             role: o => o.role,
             city: o => o.city,
-            location: o => o.location,
+            location: o => o.location[0] + '.' + o.location[1],
             colorOfEyes: o => MapColor(o.colorOfEyes),
             [MapperSpecOptionsSym]: {async: true}
         }

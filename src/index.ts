@@ -16,29 +16,29 @@ async function BuildObjectAsync(fnsWithParamsAndRKey: FPK[]): Promise<DataObject
 }
 
 export type ObjectMapSpec<O1 extends DataObject, O2 extends DataObject> = {
-    [P in keyof O2]: (o: O1) => O2[keyof O2]
+    [P in keyof O2]: (o: O1) => O2[P]
 } & {[MapperSpecOptionsSym]?: {async?: false}};
 export type AsyncObjectMapSpec<O1 extends DataObject, O2 extends DataObject> = {
-    [P in keyof O2]: (o: O1) => O2[keyof O2] | Promise<O2[keyof O2]>
+    [P in keyof O2]: (o: O1) => O2[P] | Promise<O2[P]>
 } & {[MapperSpecOptionsSym]: {async: true}};
 export const Map: {
     <O1 extends DataObject, O2 extends DataObject>(
         mapSpec: ObjectMapSpec<O1, O2>,
-        src: null | O1
+        src: O1
     ): O2
 
     <O1 extends DataObject, O2 extends DataObject>(
         mapSpec: AsyncObjectMapSpec<O1, O2>,
-        src: null | O1
+        src: O1
     ): Promise<O2>
 
     <O1 extends DataObject, O2 extends DataObject>(
         mapSpec: ObjectMapSpec<O1, O2>,
-    ): Unary<null | O1, O2>
+    ): Unary<O1, O2>
 
     <O1 extends DataObject, O2 extends DataObject>(
         mapSpec: AsyncObjectMapSpec<O1, O2>,
-    ): Unary<null | O1, Promise<O2>>
+    ): Unary<O1, Promise<O2>>
 } = Curry((
     mapSpec: AsyncObjectMapSpec<any, any> | ObjectMapSpec<any, any>,
     originalSrc: DataObject
